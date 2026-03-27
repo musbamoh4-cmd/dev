@@ -22,6 +22,19 @@ const initialUsers = [
     password: 'Memus@7',
     mustChangePassword: false,
   },
+  {
+    id: 'admin-dfeleke',
+    name: 'dfeleke',
+    username: 'dfeleke',
+    email: 'dfeleke@autosparehub.com',
+    role: 'Admin',
+    status: 'active',
+    createdAt: '3/27/2026',
+    lastAction: 'Seeded admin',
+    protected: true,
+    password: 'Dave@12',
+    mustChangePassword: false,
+  },
 ]
 
 const formatDate = () =>
@@ -32,6 +45,16 @@ const formatDate = () =>
   })
 
 const createId = () => `user-${Math.random().toString(36).slice(2, 8)}`
+
+const ensureSeedUsers = (users) => {
+  const existing = new Set(
+    users.map((user) => (user.username || '').toLowerCase()),
+  )
+  const missing = initialUsers.filter(
+    (user) => !existing.has(user.username.toLowerCase()),
+  )
+  return missing.length ? [...users, ...missing] : users
+}
 
 const getInitials = (name) => {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -51,7 +74,7 @@ export default function UserManagement() {
     try {
       const stored = JSON.parse(localStorage.getItem('app_users') || 'null')
       if (Array.isArray(stored) && stored.length > 0) {
-        return stored
+        return ensureSeedUsers(stored)
       }
     } catch {
       // Ignore storage errors and fallback to defaults.

@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 const initialForm = {
   name: '',
@@ -20,14 +20,18 @@ const formatMoney = (value) =>
     maximumFractionDigits: 2,
   })}`
 
-const formatDate = (value) =>
-  new Date(value).toLocaleString(undefined, {
+const formatDate = (value) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return date.toLocaleString(undefined, {
     year: 'numeric',
     month: 'short',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
   })
+}
 
 const generateDocId = (prefix) =>
   `${prefix}${String(Math.floor(100000 + Math.random() * 900000))}`
@@ -55,14 +59,27 @@ const generateSku = (category, batchNumber) => {
   return `ASP-${cat}-${batch.slice(-4)}-${datePart}-${rand}`
 }
 
-export default function Inbound({ onRegister, existingBatches, currentUserName }) {
+export default function Inbound({
+  onRegister,
+  existingBatches,
+  currentUserName,
+  history = [],
+}) {
   const [form, setForm] = useState(initialForm)
   const [errors, setErrors] = useState({})
   const [warnings, setWarnings] = useState({})
   const [preview, setPreview] = useState(null)
   const [serverError, setServerError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
   const lastAutoReceivedBy = useRef('')
+
+  const recentHistory = useMemo(() => {
+    if (!Array.isArray(history)) return []
+    return [...history]
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+      .slice(0, 7)
+  }, [history])
 
   useEffect(() => {
     const nextName = (currentUserName || '').trim()
@@ -241,7 +258,7 @@ export default function Inbound({ onRegister, existingBatches, currentUserName }
           <h1>Inbound — Goods Receipt Note</h1>
           <p>Register new stock • Prices in Ethiopian Birr (ETB)</p>
         </div>
-        <button className="ghost" type="button">
+        <button className="ghost" type="button" onClick={() => setShowHistory(true)}>
           View History
         </button>
       </header>
@@ -510,6 +527,60 @@ export default function Inbound({ onRegister, existingBatches, currentUserName }
             </div>
           </div>
         </section>
+      ) : null}
+
+      {showHistory ? (
+        <div className="modal-backdrop" onClick={() => setShowHistory(false)}>
+          <div className="modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <div className="modal-title">Inbound History</div>
+                <div className="modal-sub">Last 7 goods receipt notes</div>
+              </div>
+              <button
+                className="ghost-x"
+                type="button"
+                onClick={() => setShowHistory(false)}
+              >
+                X
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {recentHistory.length === 0 ? (
+                <div className="muted">No inbound records yet.</div>
+              ) : (
+                <>
+                  <div className="table-head">
+                    <div>Item</div>
+                    <div>Qty</div>
+                    <div>Received By</div>
+                    <div>Date</div>
+                  </div>
+                  {recentHistory.map((item) => (
+                    <div key={item.id} className="table-row">
+                      <div>
+                        <div className="table-product">{item.name || '-'}</div>
+                        <div className="muted">
+                          Batch {item.batchNumber || '-'} • {item.id || '-'}
+                        </div>
+                      </div>
+                      <div>{item.quantity || 0}</div>
+                      <div>{item.receivedBy || '-'}</div>
+                      <div>{formatDate(item.createdAt)}</div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+
+            <div className="modal-actions">
+              <button className="ghost" type="button" onClick={() => setShowHistory(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </section>
   )

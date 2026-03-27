@@ -153,13 +153,18 @@ function App() {
                 onRegister={registerInbound}
                 existingBatches={existingBatches}
                 currentUserName={user?.name}
+                history={inboundItems}
               />
             }
           />
           <Route
             path="/outbound"
             element={
-              <Outbound items={inventoryItems} onDispatch={registerOutbound} />
+              <Outbound
+                items={inventoryItems}
+                history={outboundItems}
+                onDispatch={registerOutbound}
+              />
             }
           />
           <Route

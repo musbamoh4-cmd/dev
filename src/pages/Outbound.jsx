@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 const formatMoney = (value) =>
   `ETB ${Number(value || 0).toLocaleString(undefined, {
@@ -6,14 +6,18 @@ const formatMoney = (value) =>
     maximumFractionDigits: 2,
   })}`
 
-const formatDate = (value) =>
-  new Date(value).toLocaleString(undefined, {
+const formatDate = (value) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return date.toLocaleString(undefined, {
     year: 'numeric',
     month: 'short',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
   })
+}
 
 const generateDocId = (prefix) =>
   `${prefix}${String(Math.floor(100000 + Math.random() * 900000))}`
@@ -36,7 +40,7 @@ const initialDirectForm = {
   destination: '',
 }
 
-export default function Outbound({ items = [], onDispatch }) {
+export default function Outbound({ items = [], history = [], onDispatch }) {
   const [saleType, setSaleType] = useState('Inventory')
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState('')
@@ -46,6 +50,14 @@ export default function Outbound({ items = [], onDispatch }) {
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [preview, setPreview] = useState(null)
+  const [showHistory, setShowHistory] = useState(false)
+
+  const recentHistory = useMemo(() => {
+    if (!Array.isArray(history)) return []
+    return [...history]
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+      .slice(0, 7)
+  }, [history])
 
   const filteredItems = useMemo(() => {
     if (!search.trim()) return items
@@ -307,7 +319,7 @@ export default function Outbound({ items = [], onDispatch }) {
           <h1>Outbound — Stock Transfer Voucher</h1>
           <p>Dispatch stock • Prices in Ethiopian Birr (ETB)</p>
         </div>
-        <button className="ghost" type="button">
+        <button className="ghost" type="button" onClick={() => setShowHistory(true)}>
           View History
         </button>
       </header>
@@ -680,6 +692,60 @@ export default function Outbound({ items = [], onDispatch }) {
             </div>
           </div>
         </section>
+      ) : null}
+
+      {showHistory ? (
+        <div className="modal-backdrop" onClick={() => setShowHistory(false)}>
+          <div className="modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <div className="modal-title">Outbound History</div>
+                <div className="modal-sub">Last 7 stock transfer vouchers</div>
+              </div>
+              <button
+                className="ghost-x"
+                type="button"
+                onClick={() => setShowHistory(false)}
+              >
+                X
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {recentHistory.length === 0 ? (
+                <div className="muted">No outbound records yet.</div>
+              ) : (
+                <>
+                  <div className="table-head">
+                    <div>Item</div>
+                    <div>Qty</div>
+                    <div>Destination</div>
+                    <div>Date</div>
+                  </div>
+                  {recentHistory.map((item) => (
+                    <div key={item.id} className="table-row">
+                      <div>
+                        <div className="table-product">{item.name || '-'}</div>
+                        <div className="muted">
+                          {item.type || 'inventory'} • {item.id || '-'}
+                        </div>
+                      </div>
+                      <div>{item.quantity || 0}</div>
+                      <div>{item.destination || '-'}</div>
+                      <div>{formatDate(item.createdAt)}</div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+
+            <div className="modal-actions">
+              <button className="ghost" type="button" onClick={() => setShowHistory(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </section>
   )

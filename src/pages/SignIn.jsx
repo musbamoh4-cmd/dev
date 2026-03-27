@@ -10,13 +10,32 @@ const defaultUsers = [
     status: 'active',
     mustChangePassword: false,
   },
+  {
+    id: 'admin-dfeleke',
+    name: 'dfeleke',
+    username: 'dfeleke',
+    password: 'Dave@12',
+    role: 'Admin',
+    status: 'active',
+    mustChangePassword: false,
+  },
 ]
+
+const ensureSeedUsers = (users) => {
+  const existing = new Set(
+    users.map((user) => (user.username || '').toLowerCase()),
+  )
+  const missing = defaultUsers.filter(
+    (user) => !existing.has(user.username.toLowerCase()),
+  )
+  return missing.length ? [...users, ...missing] : users
+}
 
 const loadUsers = () => {
   try {
     const stored = JSON.parse(localStorage.getItem('app_users') || 'null')
     if (Array.isArray(stored) && stored.length > 0) {
-      return stored
+      return ensureSeedUsers(stored)
     }
   } catch {
     // Ignore and fallback to defaults.

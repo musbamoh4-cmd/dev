@@ -4,6 +4,31 @@ const API_BASE = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '')
 
 const buildUrl = (path) => `${API_BASE}${path}`
 
+const STORAGE_KEYS = {
+  inventory: 'autospareInventory',
+  inbound: 'autospareInbound',
+  outbound: 'autospareOutbound',
+}
+
+const loadStored = (key, fallback = []) => {
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return fallback
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : fallback
+  } catch (error) {
+    return fallback
+  }
+}
+
+const persistStored = (key, value) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch (error) {
+    // Ignore storage failures (private mode, quota, etc.)
+  }
+}
+
 const normalizeNumber = (value) => {
   const num = Number(value || 0)
   return Number.isFinite(num) ? num : 0
@@ -33,9 +58,21 @@ const fetchJson = async (path, options) => {
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) {
     const message = payload?.error || 'Request failed.'
-    throw new Error(message)
+    const error = new Error(message)
+    error.status = response.status
+    error.payload = payload
+    throw error
   }
   return payload
+}
+
+const shouldFallback = (error) => {
+  if (!error) return false
+  if (error instanceof TypeError) return true
+  const message = error?.message || ''
+  if (/fetch/i.test(message)) return true
+  const status = error?.status
+  return status === 404 || status === 405 || status === 501
 }
 
 export default function useRealtimeData() {
@@ -61,79 +98,102 @@ export default function useRealtimeData() {
         setInventory(inv.items || [])
         setInbound(inb.items || [])
         setOutbound(out.items || [])
+        setStatus('live')
         updateTimestamp()
       } catch (error) {
         if (!cancelled) {
           setStatus('offline')
+          setInventory(loadStored(STORAGE_KEYS.inventory))
+          setInbound(loadStored(STORAGE_KEYS.inbound))
+          setOutbound(loadStored(STORAGE_KEYS.outbound))
         }
       }
     }
 
     loadInitial()
 
-    const source = new EventSource(buildUrl('/events'))
-    source.addEventListener('open', () => {
-      if (!cancelled) {
-        setStatus('live')
-      }
-    })
+    const shouldEnableRealtime =
+      !import.meta.env.PROD || (API_BASE && API_BASE.length > 0)
+    let source
+    if (shouldEnableRealtime) {
+      source = new EventSource(buildUrl('/events'))
+      source.addEventListener('open', () => {
+        if (!cancelled) {
+          setStatus('live')
+        }
+      })
 
-    source.addEventListener('error', () => {
-      if (!cancelled) {
-        setStatus('offline')
-      }
-    })
+      source.addEventListener('error', () => {
+        if (!cancelled) {
+          setStatus('offline')
+        }
+      })
 
-    source.addEventListener('snapshot', (event) => {
-      if (cancelled) return
-      try {
-        const payload = JSON.parse(event.data || '{}')
-        setInventory(payload.inventory || [])
-        setInbound(payload.inbound || [])
-        setOutbound(payload.outbound || [])
-        updateTimestamp()
-      } catch (error) {
-        // Ignore malformed snapshots.
-      }
-    })
+      source.addEventListener('snapshot', (event) => {
+        if (cancelled) return
+        try {
+          const payload = JSON.parse(event.data || '{}')
+          setInventory(payload.inventory || [])
+          setInbound(payload.inbound || [])
+          setOutbound(payload.outbound || [])
+          updateTimestamp()
+        } catch (error) {
+          // Ignore malformed snapshots.
+        }
+      })
 
-    source.addEventListener('inventory', (event) => {
-      if (cancelled) return
-      try {
-        setInventory(JSON.parse(event.data || '[]'))
-        updateTimestamp()
-      } catch (error) {
-        // Ignore malformed payloads.
-      }
-    })
+      source.addEventListener('inventory', (event) => {
+        if (cancelled) return
+        try {
+          setInventory(JSON.parse(event.data || '[]'))
+          updateTimestamp()
+        } catch (error) {
+          // Ignore malformed payloads.
+        }
+      })
 
-    source.addEventListener('inbound', (event) => {
-      if (cancelled) return
-      try {
-        const record = JSON.parse(event.data || '{}')
-        setInbound((prev) => [record, ...prev.filter((item) => item.id !== record.id)])
-        updateTimestamp()
-      } catch (error) {
-        // Ignore malformed payloads.
-      }
-    })
+      source.addEventListener('inbound', (event) => {
+        if (cancelled) return
+        try {
+          const record = JSON.parse(event.data || '{}')
+          setInbound((prev) => [
+            record,
+            ...prev.filter((item) => item.id !== record.id),
+          ])
+          updateTimestamp()
+        } catch (error) {
+          // Ignore malformed payloads.
+        }
+      })
 
-    source.addEventListener('outbound', (event) => {
-      if (cancelled) return
-      try {
-        const record = JSON.parse(event.data || '{}')
-        setOutbound((prev) => [record, ...prev.filter((item) => item.id !== record.id)])
-        updateTimestamp()
-      } catch (error) {
-        // Ignore malformed payloads.
-      }
-    })
+      source.addEventListener('outbound', (event) => {
+        if (cancelled) return
+        try {
+          const record = JSON.parse(event.data || '{}')
+          setOutbound((prev) => [
+            record,
+            ...prev.filter((item) => item.id !== record.id),
+          ])
+          updateTimestamp()
+        } catch (error) {
+          // Ignore malformed payloads.
+        }
+      })
+    }
 
     return () => {
       cancelled = true
-      source.close()
+      if (source) {
+        source.close()
+      }
     }
   }, [])
+
+  useEffect(() => {
+    persistStored(STORAGE_KEYS.inventory, inventory)
+    persistStored(STORAGE_KEYS.inbound, inbound)
+    persistStored(STORAGE_KEYS.outbound, outbound)
+  }, [inventory, inbound, outbound])
 
   const registerInbound = async (payload) => {
     try {
@@ -159,7 +219,7 @@ export default function useRealtimeData() {
       updateTimestamp()
       return result.record
     } catch (error) {
-      if (error instanceof TypeError || /fetch/i.test(error?.message || '')) {
+      if (shouldFallback(error)) {
         const record = {
           ...payload,
           createdAt: payload.createdAt || new Date().toISOString(),
@@ -196,7 +256,7 @@ export default function useRealtimeData() {
       updateTimestamp()
       return result.record
     } catch (error) {
-      if (error instanceof TypeError || /fetch/i.test(error?.message || '')) {
+      if (shouldFallback(error)) {
         const sourceItem =
           payload?.type === 'inventory'
             ? inventory.find((item) => item.id === payload?.itemId)

@@ -1,6 +1,7 @@
 ﻿import { NavLink } from 'react-router-dom'
 import {
   BrandIcon,
+  IconGrid,
   IconInventory,
   IconInbound,
   IconOutbound,
@@ -10,7 +11,7 @@ import {
 } from './icons'
 
 const navItems = [
-  { label: 'Dashboard', path: '/', roles: ['Admin', 'Staff'] },
+  { label: 'Dashboard', icon: IconGrid, path: '/', roles: ['Admin', 'Staff'] },
   { label: 'Inventory', icon: IconInventory, path: '/inventory', roles: ['Admin', 'Staff'] },
   { label: 'Inbound (GRN)', icon: IconInbound, path: '/inbound', roles: ['Admin', 'Staff'] },
   { label: 'Outbound (STV)', icon: IconOutbound, path: '/outbound', roles: ['Admin', 'Staff'] },
@@ -73,6 +74,17 @@ export default function Sidebar({ onSignOut, user, collapsed, onToggle }) {
           .map((item) => (
             <NavItem key={item.label} {...item} />
           ))}
+        <button
+          className="nav-item nav-signout"
+          type="button"
+          onClick={handleSignOut}
+          aria-label="Sign Out"
+        >
+          <span className="nav-ico">
+            <IconSignOut />
+          </span>
+          <span className="nav-label">Sign Out</span>
+        </button>
       </nav>
 
       <div className="support">

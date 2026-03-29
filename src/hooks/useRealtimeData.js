@@ -4,6 +4,24 @@ const API_BASE = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '')
 
 const buildUrl = (path) => `${API_BASE}${path}`
 
+const normalizeNumber = (value) => {
+  const num = Number(value || 0)
+  return Number.isFinite(num) ? num : 0
+}
+
+const createDocId = (prefix) =>
+  `${prefix}${String(Math.floor(100000 + Math.random() * 900000))}`
+
+const normalizeDocId = (prefix, value) => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (new RegExp(`^${prefix}\\d{6}$`).test(trimmed)) {
+      return trimmed
+    }
+  }
+  return createDocId(prefix)
+}
+
 const fetchJson = async (path, options) => {
   const response = await fetch(buildUrl(path), {
     headers: {
@@ -163,19 +181,61 @@ export default function useRealtimeData() {
   }
 
   const registerOutbound = async (payload) => {
-    const result = await fetchJson('/api/outbound', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    })
-    const record = result.record
-    if (result.inventory) {
-      setInventory(result.inventory)
+    try {
+      const result = await fetchJson('/api/outbound', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      })
+      const record = result.record
+      if (result.inventory) {
+        setInventory(result.inventory)
+      }
+      if (record) {
+        setOutbound((prev) => [record, ...prev.filter((item) => item.id !== record.id)])
+      }
+      updateTimestamp()
+      return result.record
+    } catch (error) {
+      if (error instanceof TypeError || /fetch/i.test(error?.message || '')) {
+        const sourceItem =
+          payload?.type === 'inventory'
+            ? inventory.find((item) => item.id === payload?.itemId)
+            : null
+        const record = {
+          id: normalizeDocId('ST', payload?.id),
+          type: payload?.type || 'inventory',
+          itemId: payload?.itemId || sourceItem?.id || null,
+          sku: payload?.sku || sourceItem?.sku || '',
+          name: (payload?.name || sourceItem?.name || '').trim(),
+          category: payload?.category || sourceItem?.category || 'General',
+          manufacturer: (payload?.manufacturer || sourceItem?.manufacturer || '').trim(),
+          uom: payload?.uom || sourceItem?.uom || 'Piece',
+          batchNumber: (payload?.batchNumber || sourceItem?.batchNumber || '').trim(),
+          supplier: (payload?.supplier || '').trim(),
+          destination: (payload?.destination || '').trim(),
+          buyPrice: normalizeNumber(payload?.buyPrice ?? sourceItem?.buyPrice ?? 0),
+          sellPrice: normalizeNumber(payload?.sellPrice ?? sourceItem?.sellPrice ?? 0),
+          quantity: normalizeNumber(payload?.quantity),
+          createdAt: payload?.createdAt || new Date().toISOString(),
+        }
+        setStatus('offline')
+        setOutbound((prev) => [record, ...prev.filter((item) => item.id !== record.id)])
+        if (record.type !== 'direct' && sourceItem) {
+          const nextQty = Math.max(
+            0,
+            normalizeNumber(sourceItem.quantity) - normalizeNumber(record.quantity),
+          )
+          setInventory((prev) =>
+            prev.map((item) =>
+              item.id === sourceItem.id ? { ...item, quantity: nextQty } : item,
+            ),
+          )
+        }
+        updateTimestamp()
+        return record
+      }
+      throw error
     }
-    if (record) {
-      setOutbound((prev) => [record, ...prev.filter((item) => item.id !== record.id)])
-    }
-    updateTimestamp()
-    return result.record
   }
 
   return useMemo(

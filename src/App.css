@@ -101,6 +101,10 @@
   box-shadow: 0 10px 24px rgba(8, 18, 40, 0.45);
 }
 
+.nav-signout {
+  display: none;
+}
+
 .nav-ico {
   width: 20px;
   height: 20px;
@@ -382,6 +386,26 @@
   color: #e7f0ff;
   font-weight: 600;
   box-shadow: 0 12px 30px rgba(45, 92, 210, 0.4);
+}
+
+.primary.is-animating {
+  position: relative;
+  overflow: hidden;
+  animation: primary-pop 0.4s ease;
+}
+
+.primary.is-animating::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 100%
+  );
+  transform: translateX(-120%);
+  animation: primary-sheen 1s ease-in-out infinite;
 }
 
 .ghost {
@@ -1259,9 +1283,124 @@
   .preview-approval {
     grid-template-columns: 1fr;
   }
+
+  .main {
+    padding: 20px 16px 28px;
+  }
+
+  .card {
+    padding: 14px;
+  }
+
+  .form-card {
+    padding: 18px;
+  }
+
+  .table-row,
+  .report-table-row,
+  .inventory-row {
+    padding: 12px;
+  }
+
+  .modal {
+    width: 94vw;
+    max-height: 88vh;
+    overflow: hidden;
+  }
+
+  .modal-body {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 @media (max-width: 600px) {
+  :root {
+    --mobile-nav-height: 72px;
+  }
+
+  .sidebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    height: var(--mobile-nav-height);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+    border-top: 1px solid rgba(70, 96, 160, 0.4);
+    box-shadow: 0 -10px 30px rgba(6, 12, 28, 0.55);
+  }
+
+  .brand,
+  .support,
+  .user-card,
+  .sidebar-toggle {
+    display: none;
+  }
+
+  .nav {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    gap: 6px;
+    flex-wrap: nowrap;
+  }
+
+  .nav-item {
+    flex: 1;
+    justify-content: center;
+    padding: 10px 0;
+    border-radius: 12px;
+  }
+
+  .nav-ico {
+    width: 22px;
+    height: 22px;
+  }
+
+  .nav-ico svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .nav-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .nav-arrow {
+    display: none;
+  }
+
+  .nav-signout {
+    display: inline-flex;
+  }
+
+  .signout {
+    display: none;
+  }
+
+  .signout-label {
+    display: none;
+  }
+
   .kpi-grid,
   .status-grid {
     grid-template-columns: 1fr;
@@ -1280,6 +1419,58 @@
   .ghost {
     width: 100%;
     justify-content: center;
+  }
+
+  .main {
+    padding: 20px 16px calc(var(--mobile-nav-height) + 24px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 420px) {
+  .main {
+    padding: 16px 12px 24px;
+  }
+
+  .form-header h1,
+  .page-header h1,
+  .dashboard-header h1,
+  .reports-header h1 {
+    font-size: 1.6rem;
+  }
+
+  .brand-title {
+    font-size: 1rem;
+  }
+}
+
+@keyframes primary-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes primary-sheen {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primary.is-animating {
+    animation: none;
+  }
+
+  .primary.is-animating::after {
+    animation: none;
   }
 }
 

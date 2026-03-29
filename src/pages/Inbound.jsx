@@ -43,20 +43,36 @@ const escapeHtml = (value) =>
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
 
-const generateSku = (category, batchNumber) => {
-  const cat = (category || 'GEN')
+const nextSkuDigits = () => {
+  try {
+    const key = 'autospareSkuSequence'
+    const raw = localStorage.getItem(key)
+    const current = Number(raw)
+    const next = Number.isFinite(current) ? current + 1 : 1
+    localStorage.setItem(key, String(next))
+    return String(next % 10000).padStart(4, '0')
+  } catch (error) {
+    const stamp = Date.now()
+    return String(stamp % 10000).padStart(4, '0')
+  }
+}
+
+const generateSku = (category) => {
+  const cleanedWords = String(category || 'General')
+    .replace(/[^A-Za-z0-9 ]/g, ' ')
     .split(' ')
-    .map((word) => word[0])
-    .join('')
-    .slice(0, 3)
-    .toUpperCase()
-  const batch = (batchNumber || 'BATCH').replace(/[^A-Za-z0-9]/g, '')
-  const stamp = new Date()
-  const datePart = `${stamp.getFullYear()}${String(
-    stamp.getMonth() + 1,
-  ).padStart(2, '0')}${String(stamp.getDate()).padStart(2, '0')}`
-  const rand = Math.floor(100 + Math.random() * 900)
-  return `ASP-${cat}-${batch.slice(-4)}-${datePart}-${rand}`
+    .filter(Boolean)
+  let prefix = cleanedWords.map((word) => word[0]).join('').toUpperCase()
+  if (!prefix) {
+    prefix = 'XX'
+  } else if (prefix.length === 1) {
+    const firstWord = cleanedWords[0] || 'X'
+    prefix = `${prefix}${firstWord[1] || 'X'}`.toUpperCase()
+  } else {
+    prefix = prefix.slice(0, 2)
+  }
+
+  return `${prefix}${nextSkuDigits()}`
 }
 
 export default function Inbound({
@@ -180,16 +196,16 @@ export default function Inbound({
 <meta charset="utf-8" />
 <title>GRN Preview</title>
 <style>
-  @page { size: A4; margin: 18mm; }
+  @page { size: A4 landscape; margin: 12mm; }
   * { box-sizing: border-box; }
   body { margin: 0; padding: 0; font-family: Arial, sans-serif; color: #0f172a; background: #fff; }
-  .page { padding: 18mm; }
-  .card { border: 1px solid #d0d7e2; border-radius: 12px; padding: 24px; position: relative; min-height: 240mm; }
+  .page { padding: 12mm; }
+  .card { border: 1px solid #d0d7e2; border-radius: 12px; padding: 20px; position: relative; min-height: auto; }
   .watermark { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
   .watermark span { font-size: 72px; font-weight: 700; letter-spacing: 6px; color: rgba(15, 23, 42, 0.08); transform: rotate(-12deg); }
   h1 { margin: 0 0 6px; font-size: 24px; }
   .sub { color: #475569; margin-bottom: 20px; }
-  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 20px; }
   .row { display: grid; gap: 4px; }
   .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; }
   .value { font-size: 14px; font-weight: 600; }
@@ -427,7 +443,11 @@ export default function Inbound({
           <button className="ghost" type="button" onClick={handleReset}>
             Reset Form
           </button>
-          <button className="primary" type="submit" disabled={isSubmitting}>
+          <button
+            className={`primary${isSubmitting ? ' is-animating' : ''}`}
+            type="submit"
+            disabled={isSubmitting}
+          >
             {isSubmitting ? 'Saving...' : '+ Finalize GRN'}
           </button>
         </div>
